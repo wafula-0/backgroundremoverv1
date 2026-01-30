@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro AI - Universal Background Remover</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/index.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .checkerboard {
+            background-image: linear-gradient(45deg, #2e3a4e 25%, transparent 25%), 
+                              linear-gradient(-45deg, #2e3a4e 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, #2e3a4e 75%), 
+                              linear-gradient(-45deg, transparent 75%, #2e3a4e 75%);
+            background-size: 20px 20px;
+        }
+        .gradient-text {
+            background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+<div class="max-w-4xl w-full grid md:grid-cols-2 gap-8 items-center">
+    <div class="space-y-6">
+        <h1 class="text-5xl font-bold">Magic <span class="gradient-text">Studio.</span></h1>
+        <p class="text-slate-400">High-performance background removal. Runs entirely in your browser via WASM technology.</p>
+        
+        <div id="dropZone" class="glass border-2 border-dashed border-slate-600 rounded-3xl p-10 text-center hover:border-indigo-500 transition-all cursor-pointer">
+            <input type="file" id="imageInput" accept="image/*" class="hidden">
+            <div id="uploadUI">
+                <p class="font-semibold text-slate-200">Click to upload image</p>
+                <p id="fileName" class="text-xs text-slate-500 mt-2">Supports JPG, PNG, WebP</p>
+            </div>
+        </div>
+
+        <button onclick="processImage()" id="actionBtn" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 py-4 rounded-2xl font-bold shadow-lg flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+            <span id="btnText">Remove Background</span>
+            <span id="progressText" class="text-[10px] uppercase mt-1 opacity-70"></span>
+        </button>
+    </div>
+
+    <div class="glass rounded-3xl p-6 min-h-[400px] flex flex-col justify-center relative overflow-hidden">
+        <div id="placeholder" class="text-center text-slate-600 italic">Result will appear here...</div>
+        
+        <div id="resultContent" class="hidden space-y-4">
+            <div id="imageFrame" class="checkerboard rounded-2xl overflow-hidden shadow-2xl">
+                <img id="outputImage" class="w-full object-contain" src="" alt="">
+            </div>
+            <button onclick="downloadFinal()" class="w-full bg-white text-slate-900 font-bold py-3 rounded-xl hover:bg-slate-200 transition-colors">
+                Download Result
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const imageInput = document.getElementById('imageInput');
+    const dropZone = document.getElementById('dropZone');
+    const actionBtn = document.getElementById('actionBtn');
+    const progressText = document.getElementById('progressText');
+    const btnText = document.getElementById('btnText');
+
+    // Trigger file input on click
+    dropZone.onclick = () => imageInput.click();
+    
+    // Show filename when selected
+    imageInput.onchange = () => { 
+        if(imageInput.files[0]) {
+            document.getElementById('fileName').innerText = imageInput.files[0].name;
+            // Reset UI for new image
+            document.getElementById('placeholder').classList.remove('hidden');
+            document.getElementById('resultContent').classList.add('hidden');
+        }
+    };
+
+    async function processImage() {
+        const file = imageInput.files[0];
+        if(!file) return alert("Select an image first!");
+
+        actionBtn.disabled = true;
+        btnText.innerText = "Processing...";
+
+        try {
+            const config = {
+                // Pointing to the CDN for model assets
+                publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/",
+                model: 'small', 
+                progress: (status, progress) => {
+                    const pct = Math.round(progress * 100);
+                    // Formatting status: e.g., "fetching_model" -> "Fetching Model"
+                    const statusClean = status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    progressText.innerText = `${statusClean}: ${pct}%`;
+                }
+            };
+
+            // FIX: Using the correct namespace 'imgly.removeBackground'
+            const blob = await imgly.removeBackground(file, config);
+            
+            // Generate a URL for the resulting blob
+            const url = URL.createObjectURL(blob);
+            const outputImg = document.getElementById('outputImage');
+            outputImg.src = url;
+
+            // Update UI
+            document.getElementById('placeholder').classList.add('hidden');
+            document.getElementById('resultContent').classList.remove('hidden');
+            progressText.innerText = "Complete!";
+
+        } catch (e) {
+            console.error(e);
+            alert("Error: " + e.message + "\n\nMake sure you are running this on a local server (http://localhost) or HTTPS.");
+        } finally {
+            actionBtn.disabled = false;
+            btnText.innerText = "Remove Background";
+        }
+    }
+
+    function downloadFinal() {
+        const imgSrc = document.getElementById('outputImage').src;
+        if(!imgSrc) return;
+        
+        const link = document.createElement('a');
+        link.download = 'removed-bg-' + Date.now() + '.png';
+        link.href = imgSrc;
+        link.click();
+    }
+</script>
+</body>
+</html>
