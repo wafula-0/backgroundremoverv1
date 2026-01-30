@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pro AI - Universal Background Remover</title>
-    
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/index.js"></script>
@@ -32,7 +31,7 @@
 <div class="max-w-4xl w-full grid md:grid-cols-2 gap-8 items-center">
     <div class="space-y-6">
         <h1 class="text-5xl font-bold">Magic <span class="gradient-text">Studio.</span></h1>
-        <p class="text-slate-400">High-performance background removal. Runs entirely in your browser via WASM technology.</p>
+        <p class="text-slate-400">High-performance background removal. Now compatible with Safari, Firefox, and Chrome via COOP/COEP isolation.</p>
         
         <div id="dropZone" class="glass border-2 border-dashed border-slate-600 rounded-3xl p-10 text-center hover:border-indigo-500 transition-all cursor-pointer">
             <input type="file" id="imageInput" accept="image/*" class="hidden">
@@ -42,7 +41,7 @@
             </div>
         </div>
 
-        <button onclick="processImage()" id="actionBtn" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 py-4 rounded-2xl font-bold shadow-lg flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+        <button onclick="processImage()" id="actionBtn" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 py-4 rounded-2xl font-bold shadow-lg flex flex-col items-center justify-center">
             <span id="btnText">Remove Background</span>
             <span id="progressText" class="text-[10px] uppercase mt-1 opacity-70"></span>
         </button>
@@ -55,7 +54,7 @@
             <div id="imageFrame" class="checkerboard rounded-2xl overflow-hidden shadow-2xl">
                 <img id="outputImage" class="w-full object-contain" src="" alt="">
             </div>
-            <button onclick="downloadFinal()" class="w-full bg-white text-slate-900 font-bold py-3 rounded-xl hover:bg-slate-200 transition-colors">
+            <button onclick="downloadFinal()" class="w-full bg-white text-slate-900 font-bold py-3 rounded-xl">
                 Download Result
             </button>
         </div>
@@ -69,55 +68,43 @@
     const progressText = document.getElementById('progressText');
     const btnText = document.getElementById('btnText');
 
-    // Trigger file input on click
     dropZone.onclick = () => imageInput.click();
+    imageInput.onchange = () => { if(imageInput.files[0]) document.getElementById('fileName').innerText = imageInput.files[0].name; };
+
     
-    // Show filename when selected
-    imageInput.onchange = () => { 
-        if(imageInput.files[0]) {
-            document.getElementById('fileName').innerText = imageInput.files[0].name;
-            // Reset UI for new image
-            document.getElementById('placeholder').classList.remove('hidden');
-            document.getElementById('resultContent').classList.add('hidden');
-        }
-    };
 
     async function processImage() {
         const file = imageInput.files[0];
         if(!file) return alert("Select an image first!");
 
         actionBtn.disabled = true;
-        btnText.innerText = "Processing...";
+        btnText.innerText = "Initializing AI...";
 
         try {
+            // Configuration optimized for Cross-Origin Isolation
             const config = {
-                // Pointing to the CDN for model assets
+                // Ensure assets are fetched from a CORS-friendly CDN
                 publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/",
-                model: 'small', 
+                model: 'small', // Faster, uses less memory on mobile
                 progress: (status, progress) => {
                     const pct = Math.round(progress * 100);
-                    // Formatting status: e.g., "fetching_model" -> "Fetching Model"
-                    const statusClean = status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    progressText.innerText = `${statusClean}: ${pct}%`;
+                    progressText.innerText = `${status.replace('_', ' ')}: ${pct}%`;
                 }
             };
 
-            // FIX: Using the correct namespace 'imgly.removeBackground'
-            const blob = await imgly.removeBackground(file, config);
+            // Run removal
+            const blob = await imglyRemoveBackground(file, config);
             
-            // Generate a URL for the resulting blob
+            // UI Updates
             const url = URL.createObjectURL(blob);
-            const outputImg = document.getElementById('outputImage');
-            outputImg.src = url;
-
-            // Update UI
+            document.getElementById('outputImage').src = url;
             document.getElementById('placeholder').classList.add('hidden');
             document.getElementById('resultContent').classList.remove('hidden');
-            progressText.innerText = "Complete!";
+            progressText.innerText = "Done!";
 
         } catch (e) {
             console.error(e);
-            alert("Error: " + e.message + "\n\nMake sure you are running this on a local server (http://localhost) or HTTPS.");
+            alert("Error: " + e.message + "\n\nNote: If you are testing locally, you must use a local server and HTTPS/Localhost.");
         } finally {
             actionBtn.disabled = false;
             btnText.innerText = "Remove Background";
@@ -125,12 +112,9 @@
     }
 
     function downloadFinal() {
-        const imgSrc = document.getElementById('outputImage').src;
-        if(!imgSrc) return;
-        
         const link = document.createElement('a');
-        link.download = 'removed-bg-' + Date.now() + '.png';
-        link.href = imgSrc;
+        link.download = 'removed-bg.png';
+        link.href = document.getElementById('outputImage').src;
         link.click();
     }
 </script>
